@@ -38,21 +38,45 @@ class GestorIncidencias {
     return incidencias.where((x) => x.estado == estado).length;
   }
 
-  Future<void> cambiarEstado(String id, String estado) async {
+  Future<void> cambiarEstado(String id, String nuevoEstado) async {
+    const estadosValidos = ['Pendiente', 'En proceso', 'Resuelta'];
+    if (!estadosValidos.contains(nuevoEstado)) {
+      throw ArgumentError.value(nuevoEstado, 'nuevoEstado', 'Estado no válido');
+    }
+
+    final incidencia = porId(id);
+    if (incidencia == null) {
+      throw StateError('No se encontró la incidencia $id');
+    }
+
+    final estadoAnterior = incidencia.estado;
+    if (estadoAnterior == nuevoEstado) return;
+
+    incidencia.estado = nuevoEstado;
+    try {
+      await datos.guardar(incidencias);
+    } catch (error) {
+      incidencia.estado = estadoAnterior;
+      rethrow;
+    }
+    cantidadPendientes = contar('Pendiente');
+  }
+
+// 2. Nuevo metodo para cambiar y guardar la prioridad desde la pantalla de detalle
+Future<void> cambiarPrioridad(String id, String nuevaPrioridad) async {
     for (var i = 0; i < incidencias.length; i++) {
       if (incidencias[i].id == id) {
-        incidencias[i].estado = estado;
+        incidencias[i].prioridad = nuevaPrioridad;
         break;
       }
     }
-    // Actualizamos el contador de pendientes y guardamos para que no se borre al reiniciar
-    cantidadPendientes =
-        incidencias.where((x) => x.estado == 'Pendiente').length;
+    // Guardar cambios en el almacenamiento local
     await datos.guardar(incidencias);
   }
 
+// 1. Actualizar el metodo crear para incluir la prioridad seleccionada
   Future<void> crear(String titulo, String descripcion, String cliente,
-      String categoria) async {
+      String categoria, String prioridad) async { // <--- Añadir parametro prioridad
     final nuevo = Incidencia(
       id: 'INC-${DateTime.now().microsecondsSinceEpoch}',
       titulo: titulo,
@@ -61,9 +85,12 @@ class GestorIncidencias {
       categoria: categoria,
       estado: 'Pendiente',
       fecha: DateTime.now().toIso8601String().split('T').first,
+      prioridad: prioridad, // <--- Asigno la prioridad aqui
     );
     incidencias.insert(0, nuevo);
-    cantidadPendientes++;
+    if (nuevo.estado == 'Pendiente') {
+      cantidadPendientes++;
+    }
     await datos.guardar(incidencias);
   }
 

@@ -16,6 +16,10 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
   bool cargando = true;
   String? error;
   String busqueda = '';
+  // Variables para los filtros
+   String estadoSeleccionado = 'Todos';
+   String prioridadSeleccionada = 'Todas';
+
 
   @override
   void initState() {
@@ -36,6 +40,26 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
     if (mounted) setState(() => cargando = false);
   }
 
+// Metodo para aplicar busqueda y filtros combinados (Texto, Estado y Prioridad)
+  List<Incidencia> get _itemsFiltrados {
+    // Obtenemos primero los elementos que coinciden con el texto de búsqueda del gestor
+    final baseItems = g.buscar(busqueda);
+
+    return baseItems.where((item) {
+      final coincideEstado = estadoSeleccionado == 'Todos' || item.estado == estadoSeleccionado;
+      final coincidePrioridad = prioridadSeleccionada == 'Todas' || item.prioridad == prioridadSeleccionada;
+      return coincideEstado && coincidePrioridad;
+    }).toList();
+  }
+
+  // Metodo para restablecer los filtros y la consulta de bsqueda
+  void _restablecerFiltros() {
+    setState(() {
+      busqueda = '';
+      estadoSeleccionado = 'Todos';
+      prioridadSeleccionada = 'Todas';
+    });
+  }
   Color colorEstado(String estado) {
     if (estado == 'Resuelta') return const Color(0xFF147D64);
     if (estado == 'En proceso') return const Color(0xFFB56B13);
@@ -84,7 +108,7 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
 
   @override
   Widget build(BuildContext context) {
-    final items = g.buscar(busqueda);
+    final items = _itemsFiltrados;
     return Scaffold(
       appBar: AppBar(
         title: const Text('NexaSoft | Incidencias'),
@@ -158,6 +182,59 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
                               border: OutlineInputBorder(),
                             ),
                             onChanged: (texto) => setState(() => busqueda = texto),
+                            controller: TextEditingController.fromValue(
+                              TextEditingValue(
+                                text: busqueda,
+                                selection: TextSelection.collapsed(offset: busqueda.length),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // FILTROS COMBINABLES (Estado y Prioridad) + BOTÓN RESTABLECER
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 5),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: estadoSeleccionado,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Estado',
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  ),
+                                  items: ['Todos', 'Pendiente', 'En proceso', 'Resuelta']
+                                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                                      .toList(),
+                                  onChanged: (val) => setState(() => estadoSeleccionado = val!),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: DropdownButtonFormField<String>(
+                                  value: prioridadSeleccionada,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Prioridad',
+                                    border: OutlineInputBorder(),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  ),
+                                  items: ['Todas', 'Baja', 'Media', 'Alta']
+                                      .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                                      .toList(),
+                                  onChanged: (val) => setState(() => prioridadSeleccionada = val!),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                                ),
+                                onPressed: _restablecerFiltros,
+                                icon: const Icon(Icons.clear_all, size: 18),
+                                label: const Text('Limpiar'),
+                              ),
+                            ],
                           ),
                         ),
                         Padding(
@@ -169,7 +246,29 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
                         ),
                         Expanded(
                           child: items.isEmpty
-                              ? const Center(child: Text('No se encontraron incidencias'))
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.search_off, size: 48, color: Colors.grey),
+                                        const SizedBox(height: 12),
+                                        const Text(
+                                          'No se encontraron incidencias con los filtros aplicados.',
+                                          style: TextStyle(fontSize: 16, color: Colors.grey),
+                                          textAlign: TextAlign.center,
+                                        ),
+                                        const SizedBox(height: 12),
+                                        OutlinedButton.icon(
+                                          onPressed: _restablecerFiltros,
+                                          icon: const Icon(Icons.refresh),
+                                          label: const Text('Restablecer búsqueda y filtros'),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
                               : ListView.builder(
                                   padding: const EdgeInsets.only(left: 12, right: 12, bottom: 100),
                                   itemCount: items.length,
@@ -185,7 +284,7 @@ class _PantallaPrincipalState extends State<PantallaPrincipal> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text('${item.id}  ·  ${item.cliente}'),
+                                              Text('${item.id}  ·  ${item.cliente}  ·  ${item.prioridad}'),
                                               const SizedBox(height: 6),
                                               Text(item.estado, style: TextStyle(
                                                 color: colorEstado(item.estado), fontWeight: FontWeight.bold,
